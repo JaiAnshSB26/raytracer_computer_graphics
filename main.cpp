@@ -98,7 +98,7 @@ public:
 		if (delta < 0) return false;
 		double t1 = (-b - sqrt(delta)) / 2.0; //check if t1 or t2 is positive or not too (note from the lecture.)
 		//smallest is t1,  from the thing but we want the smallest positive one.
-		//distance to the camera initially remember too.
+		//distance to the camera initially remember too. (lecture note for 2nd td.)
 		double t2 = (-b + sqrt(delta)) / 2.0; //check with the professor on this, not too sure on this.
 		if (t2 < 0) return false;
 		//We want the smallest possible t
@@ -142,14 +142,14 @@ public:
 
 		// TODO (lab 1): iterate through the objects and check the intersections with all of them, 
 		// and keep the closest intersection, i.e., the one if smallest positive value of t
-		t = 1e9; // Initializing to a very large value (infinity) I guess.
+		t = 1e9; // Initializing to a very large value (infinity), the general appraoch.
 		bool has_intersection = false;
-		//Idea is to loop through all the intersections to find the nearest thing.
+		//Idea is to loop through all the intersections to find the nearest thing (as taught in the lecture).
 		for (int i = 0; i < objects.size(); i++) {
-			Vector P_cur, N_cur; //self note- debug this might break during compilation.
+			Vector P_cur, N_cur; //self note- debug this might break during compilation, check this block again.
 			double t_cur;
 			if (objects[i]->intersect(ray, P_cur, t_cur, N_cur)) {
-				//basicly we found the intersection, is it closer we do that here.
+				//basicly we found the intersection, is it closer we do that check/computatioon here.
 				if (t_cur < t) {
 					t = t_cur;
 					P = P_cur;
@@ -179,9 +179,8 @@ public:
 
 			if (objects[object_id]->mirror) {
 				Vector R = ray.u - 2.0 * dot(ray.u, N) * N;
-				// Vector R = ray.u - 2.0 * dot(ray.u, N-1) * N;
 				Ray R_ray(P + 1e-4 * N, R);
-				// return getColor in the reflected direction, with recursion_depth+1 (recursively)
+				// TO-DO: return getColor in the reflected direction, with recursion_depth+1 (recursively)
 				return getColor(R_ray, recursion_depth + 1);
 			} // else
 
@@ -195,22 +194,20 @@ public:
 			Vector L = light_position - P;
 			double d = L.norm();
 			L.normalize();
-
 			//Imp: Shadow ray, offset slightly to avoid self-intersection
 			Ray shadow_ray(P + 1e-4 * N, L);
 			Vector P_s, N_s;
 			double t_s;
 			int object_id_s;
 
-			//you also wanna change the value and stuff to make sure things are considered.
-			// If we hit an object and it's closer than the light (t_s < d), we are in shadow!
+			// If we hit an object and it's closer than the light (t_s < d), we are in shadow, so we need to implement that check here.
 			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s) && t_s < d) {
 				return Vector(0, 0, 0); // Pitch black shadow I assume?
 			}
 			double intensity = light_intensity / (4.0 * M_PI * d * d);
 			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
 
-			// Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi) // but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so implemented what seemed more compliant to me.
+			// Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi),  but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so I implemented what seemed more compliant to me.
 			Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
 
 			return diffuse_color;
@@ -252,19 +249,19 @@ int main() {
 	scene.light_position = Vector(-10,20,40);
 	scene.light_intensity = 3E7;
 	scene.fov = 60 * M_PI / 180.;
-	scene.gamma = 1.0;    // TODO (lab 1) : play with gamma ; typically, gamma = 2.2
+	scene.gamma = 2.2;    // TODO (lab 1) : play with gamma ; typically, gamma = 2.2
 	scene.max_light_bounce = 5;
 
 	scene.addObject(&center_sphere);
 
-	/*
+
 	scene.addObject(&wall_left);
 	scene.addObject(&wall_right);
 	scene.addObject(&wall_front);
 	scene.addObject(&wall_behind);
 	scene.addObject(&ceiling);
 	scene.addObject(&floor);
-	*/
+	
 
 	std::vector<unsigned char> image(W * H * 3, 0);
 
@@ -279,10 +276,10 @@ int main() {
 			double z = -W / (2.0 * tan(scene.fov / 2.0)); //Map focal lenght via W and FOV.
 			//New Ray and new origin remember.
 			
-			// Vector ray_direction(0., 0., -1);
+			// Vector ray_direction(0., 0., -1); - Added the real x, y, z computed values now.
 			Vector ray_direction(x, y, z);
 			//Adding the ray direction normalization here too.
-			ray_direction.normalize(); //we must ensure that the lenght is exactly 1.
+			ray_direction.normalize(); //we must ensure that the lenght is exactly 1 (reminder to self).
 
 
 			Ray ray(scene.camera_center, ray_direction);
@@ -303,8 +300,10 @@ int main() {
 	return 0;
 }
 
-//Notes for self during lecture -
+//Notes for self during lecture and for future labs.
 //Don't forget the object id and all too.
 //Put white pixel if there is an intersection for example.
 //don't forget to return the object_id.
 //if image is totally white it might be possible your camera is inside the thing.
+//you also wanna change the value and stuff to make sure things are considered.
+//Don't forget to tweak the gamma function.
