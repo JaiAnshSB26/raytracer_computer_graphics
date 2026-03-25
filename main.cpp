@@ -90,7 +90,23 @@ public:
 	// and the unit normal N
 	bool intersect(const Ray& ray, Vector& P, double &t, Vector& N) const {
 		 // TODO (lab 1) : compute the intersection (just true/false at the begining of lab 1, then P, t and N as well)
-		return false;
+		Vector L = ray.O - C;
+		double b = 2 * dot(ray.u, L);
+		double c = dot(L, L) - R * R;
+		//self - note: check the definition on the slides once again, don't rely on your goldfish memory alone.
+		double delta = b * b - 4 * c;
+		if (delta < 0) return false;
+		double t1 = (-b - sqrt(delta)) / 2.0; //check if t1 or t2 is positive or not too (note from the lecture.)
+		//smallest is t1,  from the thing but we want the smallest positive one.
+		//distance to the camera initially remember too.
+		double t2 = (-b + sqrt(delta)) / 2.0; //check with the professor on this, not too sure on this.
+		if (t2 < 0) return false;
+		//We want the smallest possible t
+		t = (t1 >= 0) ? t1 : t2;
+		P = ray.O + t * ray.u; // P(t) = O + t*u
+		N = P - C;
+		N.normalize();
+		return true;
 	}
 
 	double R;
@@ -126,8 +142,25 @@ public:
 
 		// TODO (lab 1): iterate through the objects and check the intersections with all of them, 
 		// and keep the closest intersection, i.e., the one if smallest positive value of t
+		t = 1e9; // Initializing to a very large value (infinity) I guess.
+		bool has_intersection = false;
+		//Idea is to loop through all the intersections to find the nearest thing.
+		for (int i = 0; i < objects.size(); i++) {
+			Vector P_cur, N_cur; //self note- debug this might break during compilation.
+			double t_cur;
+			if (objects[i]->intersect(ray, P_cur, t_cur, N_cur)) {
+				//basicly we found the intersection, is it closer we do that here.
+				if (t_cur < t) {
+					t = t_cur;
+					P = P_cur;
+					N = N_cur;
+					object_id = i;
+					has_intersection = true;
+				}
+			}
+		}
+		return has_intersection;
 
-		return false;
 	}
 
 
@@ -145,8 +178,11 @@ public:
 		if (intersect(ray, P, t, N, object_id)) {
 
 			if (objects[object_id]->mirror) {
-
+				Vector R = ray.u - 2.0 * dot(ray.u, N) * N;
+				// Vector R = ray.u - 2.0 * dot(ray.u, N-1) * N;
+				Ray R_ray(P + 1e-4 * N, R);
 				// return getColor in the reflected direction, with recursion_depth+1 (recursively)
+				return getColor(R_ray, recursion_depth + 1);
 			} // else
 
 			if (objects[object_id]->transparent) { // optional
@@ -156,12 +192,33 @@ public:
 
 			// test if there is a shadow by sending a new ray
 			// if there is no shadow, compute the formula with dot products etc.
+			Vector L = light_position - P;
+			double d = L.norm();
+			L.normalize();
 
+			//Imp: Shadow ray, offset slightly to avoid self-intersection
+			Ray shadow_ray(P + 1e-4 * N, L);
+			Vector P_s, N_s;
+			double t_s;
+			int object_id_s;
+
+			//you also wanna change the value and stuff to make sure things are considered.
+			// If we hit an object and it's closer than the light (t_s < d), we are in shadow!
+			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s) && t_s < d) {
+				return Vector(0, 0, 0); // Pitch black shadow I assume?
+			}
+			double intensity = light_intensity / (4.0 * M_PI * d * d);
+			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
+
+			// Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi) // but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so implemented what seemed more compliant to me.
+			Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
+
+			return diffuse_color;
 
 			// TODO (lab 2) : add indirect lighting component with a recursive call
 		}
 
-		
+
 
 		return Vector(0, 0, 0);
 	}
@@ -191,7 +248,7 @@ int main() {
 	Sphere floor(Vector(0, -1000, 0), 990, Vector(0.6, 0.5, 0.7));
 
 	Scene scene;
-	scene.camera_center = Vector(0, 0, 0);
+	scene.camera_center = Vector(0, 0, 55); //Change in lecture.
 	scene.light_position = Vector(-10,20,40);
 	scene.light_intensity = 3E7;
 	scene.fov = 60 * M_PI / 180.;
@@ -217,7 +274,16 @@ int main() {
 			Vector color;
 
 			// TODO (lab 1) : correct ray_direction so that it goes through each pixel (j, i)			
-			Vector ray_direction(0., 0., -1);
+			double x = j - W / 2.0 + 0.5; //Center horizontal pixel mapping.
+			double y = H / 2.0 - i - 0.5; //Center the vertical mapping (basically invert the y-axis like explained int he class.)
+			double z = -W / (2.0 * tan(scene.fov / 2.0)); //Map focal lenght via W and FOV.
+			//New Ray and new origin remember.
+			
+			// Vector ray_direction(0., 0., -1);
+			Vector ray_direction(x, y, z);
+			//Adding the ray direction normalization here too.
+			ray_direction.normalize(); //we must ensure that the lenght is exactly 1.
+
 
 			Ray ray(scene.camera_center, ray_direction);
 
@@ -236,3 +302,9 @@ int main() {
 
 	return 0;
 }
+
+//Notes for self during lecture -
+//Don't forget the object id and all too.
+//Put white pixel if there is an intersection for example.
+//don't forget to return the object_id.
+//if image is totally white it might be possible your camera is inside the thing.
