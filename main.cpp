@@ -342,7 +342,16 @@ int main() {
 	//I commented out the testing for the Lab 1 transparency part for now, since that is completely messign up.
 	// Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), false);
 	//Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false); //check from the original.
-	Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false);
+	
+	//Comment out the single thing.
+	// Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false);
+
+	// Create 3 spheres at different depths to demonstrate Depth of Field
+	//Light intensity slightly darker because there are pure whites at many place - (darker or albedo smaller.)
+	Sphere sphere_front(Vector(-12, 0, 25), 10., Vector(0.8, 0.3, 0.8), false); // Magenta - Blurry (Too close)
+	Sphere sphere_middle(Vector(0, 0, 0), 10., Vector(0.9, 0.9, 0.9), false);   // White - Sharp (At focal distance)
+	Sphere sphere_back(Vector(12, 0, -25), 10., Vector(0.2, 0.5, 0.8), false);  // Blue - Blurry (Too far)
+
 	Sphere wall_left(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
 	Sphere wall_right(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
 	Sphere wall_front(Vector(0, 0, -1000), 940, Vector(0.1, 0.6, 0.7));
@@ -358,8 +367,12 @@ int main() {
 	scene.gamma = 2.2;    // TODO (lab 1) : play with gamma ; typically, gamma = 2.2
 	scene.max_light_bounce = 5;
 
-	scene.addObject(&center_sphere);
+	//Comment out the single sphere for now.
+	//scene.addObject(&center_sphere);
 
+	scene.addObject(&sphere_front);
+	scene.addObject(&sphere_middle);
+	scene.addObject(&sphere_back);
 
 	scene.addObject(&wall_left);
 	scene.addObject(&wall_right);
