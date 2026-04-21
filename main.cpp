@@ -350,7 +350,7 @@ int main() {
 	//Light intensity slightly darker because there are pure whites at many place - (darker or albedo smaller.)
 	Sphere sphere_front(Vector(-12, 0, 25), 10., Vector(0.8, 0.3, 0.8), false); // Magenta - Blurry (Too close)
 	Sphere sphere_middle(Vector(0, 0, 0), 10., Vector(0.9, 0.9, 0.9), false);   // White - Sharp (At focal distance)
-	Sphere sphere_back(Vector(12, 0, -25), 10., Vector(0.2, 0.5, 0.8), false);  // Blue - Blurry (Too far)
+	Sphere sphere_back(Vector(12, 0, -25), 10., Vector(0.2, 0.5, 0.8), true, false);  // Blue - Blurry (Too far)
 
 	Sphere wall_left(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
 	Sphere wall_right(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
