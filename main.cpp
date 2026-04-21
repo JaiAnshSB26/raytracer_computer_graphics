@@ -2,7 +2,10 @@
 #include <vector>
 #include <cmath>
 #include <random>
-
+//Imports for Lab2
+#include <omp.h>
+#include <algorithm>
+//New Imports done for Lab2.
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -63,6 +66,36 @@ double dot(const Vector& a, const Vector& b) {
 Vector cross(const Vector& a, const Vector& b) {
 	return Vector(a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]);
 }
+Vector operator*(const Vector& a, const Vector& b){
+	return Vector(a[0] * b[0], a[1] * b[1], a[2] * b[2]); // Element-wise multiplication needed for indirect lighting
+}
+
+//Things needed for Lab 2 defined on the very top.
+//Firstly, the random cosine-weighted vector around a normal (Box-Muller adaptation.)
+Vector random_cos(const Vector& N, int thread_id){
+	double r1 = uniform(engine[thread_id]);
+	double r2 = uniform(engine[thread_id]);
+
+	double x = cos(2.0 * M_PI * r1) * sqrt(1.0 - r2); 
+	double y = sin(2.0 * M_PI * r1) * sqrt(1.0 - r2);
+	double z = sqrt(r2);
+
+	//We now need to generate the orthogonal tangent frame for the normal mapping.
+	Vector T1;
+	if (std::abs(N[0]) <= std::abs(N[1]) && std::abs(N[0]) <= std::abs(N[2])) {
+		T1 = Vector(0, -N[2], N[1]);
+	} else if (std::abs(N[1]) <= std::abs(N[0]) && std::abs(N[1]) <= std::abs(N[2])) {
+		T1 = Vector(-N[2], 0, N[0]);
+	} else {
+		T1 = Vector(-N[1], N[0], 0);
+	}
+	T1.normalize();
+	Vector T2 = cross(N, T1);
+
+	//Now as per the lectures, we need to transform the local Box-Muller point into the world space relative to the Normal.
+	return x * T1 + y * T2 + z * N;
+}
+
 
 class Ray {
 public:
@@ -100,9 +133,9 @@ public:
 		//smallest is t1,  from the thing but we want the smallest positive one.
 		//distance to the camera initially remember too. (lecture note for 2nd td.)
 		double t2 = (-b + sqrt(delta)) / 2.0; //check with the professor on this, not too sure on this.
-		if (t2 < 0) return false;
+		if (t2 < 1e-5) return false;
 		//We want the smallest possible t
-		t = (t1 >= 0) ? t1 : t2;
+		t = (t1 > 1e-5) ? t1 : t2;
 		P = ray.O + t * ray.u; // P(t) = O + t*u
 		N = P - C;
 		N.normalize();
@@ -187,11 +220,47 @@ public:
 			if (objects[object_id]->transparent) { // optional
 
 				// return getColor in the refraction direction, with recursion_depth+1 (recursively)
+				//Note: I did this at the beginning of lab 2, since I was really curious about this!
+				//It is implemented using my favourite principles - the Snell-Descartes law, comncept of Total Internal Reflection, Fresnel's law/Schlick's approximation and a hint of Russian roulette as given on pg 21!
+				// double n1 = 1.0; // Air
+				// double n2 = 1.5; // Glass
+				// Vector N_real = N;
+
+				// // If we are exiting the sphere, we must flip the normal and indices of refraction?
+				
+				// if (dot(ray.u, N) > 0) {
+				// 	std::swap(n1, n2);
+				// 	N_real = N * -1.0;
+				// // } else {
+				// // 	cos_i = -cos_i;
+				// // }
+				// }
+				// // Cosine of incidence angle (dot_u_N is guaranteed to be <= 0)
+				// double dot_u_N = dot(ray.u, N_real);
+				// double cos_i = -dot_u_N; // Positive value for Fresnel formula
+				// //Now the TIR
+				// double rad = 1.0 - sqr(n1 / n2) * (1.0 - sqr(cos_i));
+				// Vector reflected_dir = ray.u - 2.0 * dot_u_N * N_real;
+				
+				// // Schlick's approximation for Fresnel reflection
+				// double k0 = sqr((n1 - n2) / (n1 + n2));
+				// double R = k0 + (1.0 - k0) * pow(1.0 - cos_i, 5);
+
+				// //We use random number to simulate partial reflection/refraction
+				// if (rad < 0 || uniform(engine[0]) < R) {
+				// 	return getColor(Ray(P + 1e-4 * N_real, reflected_dir), recursion_depth + 1);
+				// } else { // Refraction 
+				// 	// exact math from the lecture slides now:
+				// 	Vector wTt = (ray.u - dot_u_N * N_real) * (n1 / n2); 
+				// 	Vector wNt = N_real * (-sqrt(rad));
+				// 	Vector refracted_dir = wTt + wNt;
+				// 	return getColor(Ray(P - 1e-4 * N_real, refracted_dir), recursion_depth + 1);
+				// }
 			} // else
 
 			// test if there is a shadow by sending a new ray
 			// if there is no shadow, compute the formula with dot products etc.
-			Vector L = light_position - P;
+			Vector L = light_position - (1e-4 * N + P); //restore to original and ask about getting rid of the dsrk edges in mirror. 
 			double d = L.norm();
 			L.normalize();
 			//Imp: Shadow ray, offset slightly to avoid self-intersection
@@ -236,7 +305,7 @@ int main() {
 		engine[i].seed(i);
 	}
 
-	Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8));
+	Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true);
 	Sphere wall_left(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
 	Sphere wall_right(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
 	Sphere wall_front(Vector(0, 0, -1000), 940, Vector(0.1, 0.6, 0.7));
@@ -245,10 +314,10 @@ int main() {
 	Sphere floor(Vector(0, -1000, 0), 990, Vector(0.6, 0.5, 0.7));
 
 	Scene scene;
-	scene.camera_center = Vector(0, 0, 30); //Change in lecture.
+	scene.camera_center = Vector(0, 0, 55); //Change in lecture.
 	scene.light_position = Vector(-10,20,40);
 	scene.light_intensity = 3E7;
-	scene.fov = 90 * M_PI / 180.;
+	scene.fov = 60 * M_PI / 180.;
 	scene.gamma = 2.2;    // TODO (lab 1) : play with gamma ; typically, gamma = 2.2
 	scene.max_light_bounce = 5;
 
@@ -307,3 +376,4 @@ int main() {
 //if image is totally white it might be possible your camera is inside the thing.
 //you also wanna change the value and stuff to make sure things are considered.
 //Don't forget to tweak the gamma function.
+//Define your epsilon constant too, don't use lose values for those purposes its not the best programming practice.
