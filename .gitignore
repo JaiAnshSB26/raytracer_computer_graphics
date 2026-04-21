@@ -6,3 +6,7 @@
 # Compiled object files
 *.o
 *.obj
+
+#Backup files.
+main_backup.cpp
+main_official_real.cpp
