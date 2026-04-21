@@ -377,7 +377,7 @@ int main() {
 		for (int j = 0; j < W; j++) {
 
 			Vector pixelColor(0., 0., 0.);
-			int NB_PATHS = 1000; // Defined as per the slides, effectively the number of rays we are sending per pixel, test more/less as I experimented later with 32, 64 and 1000 - multi-threaded hence it ran in 43 seconds.
+			int NB_PATHS = 64; // Defined as per the slides, effectively the number of rays we are sending per pixel, test more/less as I experimented later with 32, 64 and 1000 - multi-threaded hence it ran in 43 seconds.
 			
 			for (int k = 0; k < NB_PATHS; k++) {
 				// Box-Muller Gaussian jitter per pixel for anti-aliasing
@@ -392,7 +392,26 @@ int main() {
 				Vector ray_direction(x, y, z);
 				ray_direction.normalize();
 
-				Ray ray(scene.camera_center, ray_direction);
+				// Depth of field implementation - It was mentioned optional on the slides but I still wanted to implement it...
+				double aperture_radius = 2.0; // The larger the radius, the stronger the DoF blur I assume...
+				double focus_distance = 55.0; // Distance to the center_sphere (from Z=55 to Z=0....I f I remember correctly...)
+				
+				double t_focus = focus_distance / std::abs(ray_direction[2]);
+				Vector focal_point = scene.camera_center + ray_direction * t_focus;
+				
+				double r1_lens = uniform(engine[thread_id]);
+				double r2_lens = uniform(engine[thread_id]);
+				double dx = aperture_radius * sqrt(r1_lens) * cos(2.0 * M_PI * r2_lens);
+				double dy = aperture_radius * sqrt(r1_lens) * sin(2.0 * M_PI * r2_lens);
+				
+				Vector new_origin = scene.camera_center + Vector(dx, dy, 0);
+				Vector new_direction = focal_point - new_origin;
+				new_direction.normalize();
+
+				Ray ray(new_origin, new_direction);
+
+
+				// Ray ray(scene.camera_center, ray_direction);
 
 				pixelColor = pixelColor + scene.getColor(ray, 0, thread_id);
 			}
