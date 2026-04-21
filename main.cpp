@@ -209,7 +209,7 @@ public:
 
 
 	// return the radiance (color) along ray
-	Vector getColor(const Ray& ray, int recursion_depth) {
+	Vector getColor(const Ray& ray, int recursion_depth, int thread_id = 0) {
 
 		if (recursion_depth >= max_light_bounce) return Vector(0, 0, 0);
 
@@ -296,9 +296,16 @@ public:
 			// We need to randomly sample the hemisphere using a cosine-weighted distribution
 			Vector indirect_direction = random_cos(N, thread_id);
 			Ray randomRay(P + 1e-4 * N, indirect_direction);
+			// Ray randomRay(P + 1e-4 * N, indirect_direction);
+			// Only sum the indirect lighting if we haven't hit max recursion
+			if (recursion_depth + 1 < max_light_bounce) {
+				Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
+				return direct_lighting + indirect_lighting;
+			}
+			return direct_lighting;
 
 			// Due to importance sampling, the Pi and Cos terms mathematically cancel out
-			Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
+			// Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
 
 			// // Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi),  but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so I implemented what seemed more compliant to me.
 			// Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
@@ -308,7 +315,7 @@ public:
 
 			// TODO (lab 2) : add indirect lighting component with a recursive call
 			//The methods defined above.
-			return direct_lighting + indirect_lighting;
+			//return direct_lighting + indirect_lighting; - Test out first.
 		}
 
 
@@ -333,8 +340,9 @@ int main() {
 	}
 
 	//I commented out the testing for the Lab 1 transparency part for now, since that is completely messign up.
-	Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), false);
+	// Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), false);
 	//Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false); //check from the original.
+	Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false);
 	Sphere wall_left(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
 	Sphere wall_right(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
 	Sphere wall_front(Vector(0, 0, -1000), 940, Vector(0.1, 0.6, 0.7));
@@ -365,38 +373,80 @@ int main() {
 
 #pragma omp parallel for schedule(dynamic, 1)
 	for (int i = 0; i < H; i++) {
+		int thread_id = omp_get_thread_num(); // Thread safety for random generator engine
 		for (int j = 0; j < W; j++) {
-			Vector color;
 
-			// TODO (lab 1) : correct ray_direction so that it goes through each pixel (j, i)			
-			double x = j - W / 2.0 + 0.5; //Center horizontal pixel mapping.
-			double y = H / 2.0 - i - 0.5; //Center the vertical mapping (basically invert the y-axis like explained int he class.)
-			double z = -W / (2.0 * tan(scene.fov / 2.0)); //Map focal lenght via W and FOV.
-			//New Ray and new origin remember.
+			Vector pixelColor(0., 0., 0.);
+			int NB_PATHS = 1000; // Defined as per the slides, effectively the number of rays we are sending per pixel, test more/less as I experimented later with 32, 64 and 1000 - multi-threaded hence it ran in 43 seconds.
 			
-			// Vector ray_direction(0., 0., -1); - Added the real x, y, z computed values now.
-			Vector ray_direction(x, y, z);
-			//Adding the ray direction normalization here too.
-			ray_direction.normalize(); //we must ensure that the lenght is exactly 1 (reminder to self).
+			for (int k = 0; k < NB_PATHS; k++) {
+				// Box-Muller Gaussian jitter per pixel for anti-aliasing
+				double x_offset, y_offset;
+				boxMuller(0.5, x_offset, y_offset, thread_id);
+				
+				// TODO (lab 1) : correct ray_direction so that it goes through each pixel (j, i)
+				double x = (j + x_offset) - W / 2.0 + 0.5;
+				double y = H / 2.0 - (i + y_offset) - 0.5;
+				double z = -W / (2.0 * tan(scene.fov / 2.0)); 
+				
+				Vector ray_direction(x, y, z);
+				ray_direction.normalize();
 
+				Ray ray(scene.camera_center, ray_direction);
 
-			Ray ray(scene.camera_center, ray_direction);
+				pixelColor = pixelColor + scene.getColor(ray, 0, thread_id);
+			}
 
-			// TODO (lab 2) : add Monte Carlo / averaging of random ray contributions here
-			// TODO (lab 2) : add antialiasing by altering the ray_direction here
-			// TODO (lab 2) : add depth of field effect by altering the ray origin (and direction) here
+			// Average color from total paths
+			pixelColor = pixelColor / NB_PATHS;
 
-			color  = scene.getColor(ray, 0);
-
-			image[(i * W + j) * 3 + 0] = std::min(255., std::max(0., 255. * std::pow(color[0] / 255., 1. / scene.gamma)));
-			image[(i * W + j) * 3 + 1] = std::min(255., std::max(0., 255. * std::pow(color[1] / 255., 1. / scene.gamma)));
-			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(color[2] / 255., 1. / scene.gamma)));
+			image[(i * W + j) * 3 + 0] = std::min(255., std::max(0., 255. * std::pow(pixelColor[0] / 255., 1. / scene.gamma)));
+			image[(i * W + j) * 3 + 1] = std::min(255., std::max(0., 255. * std::pow(pixelColor[1] / 255., 1. / scene.gamma)));
+			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(pixelColor[2] / 255., 1. / scene.gamma)));
 		}
 	}
 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
 
 	return 0;
 }
+
+// Non-multi-threaded initial partial code - with the initial class intructions.
+// #pragma omp parallel for schedule(dynamic, 1)
+// 	for (int i = 0; i < H; i++) {
+// 		int thread_id = omp_get_thread_num(); // I try to add thread safety for random generator engine, I hope it works.
+// 		for (int j = 0; j < W; j++) {
+// 			Vector color;
+
+// 			// TODO (lab 1) : correct ray_direction so that it goes through each pixel (j, i)			
+// 			double x = j - W / 2.0 + 0.5; //Center horizontal pixel mapping.
+// 			double y = H / 2.0 - i - 0.5; //Center the vertical mapping (basically invert the y-axis like explained int he class.)
+// 			double z = -W / (2.0 * tan(scene.fov / 2.0)); //Map focal lenght via W and FOV.
+// 			//New Ray and new origin remember.
+			
+// 			// Vector ray_direction(0., 0., -1); - Added the real x, y, z computed values now.
+// 			Vector ray_direction(x, y, z);
+// 			//Adding the ray direction normalization here too.
+// 			ray_direction.normalize(); //we must ensure that the lenght is exactly 1 (reminder to self).
+
+
+// 			Ray ray(scene.camera_center, ray_direction);
+
+// 			// TODO (lab 2) : add Monte Carlo / averaging of random ray contributions here
+// 			// TODO (lab 2) : add antialiasing by altering the ray_direction here
+// 			// TODO (lab 2) : add depth of field effect by altering the ray origin (and direction) here
+
+// 			color  = scene.getColor(ray, 0);
+
+// 			image[(i * W + j) * 3 + 0] = std::min(255., std::max(0., 255. * std::pow(color[0] / 255., 1. / scene.gamma)));
+// 			image[(i * W + j) * 3 + 1] = std::min(255., std::max(0., 255. * std::pow(color[1] / 255., 1. / scene.gamma)));
+// 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(color[2] / 255., 1. / scene.gamma)));
+// 		}
+// 	}
+// 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
+
+// 	return 0;
+// }
+
 
 //Notes for self during lecture and for future labs.
 //Don't forget the object id and all too.
