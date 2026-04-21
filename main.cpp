@@ -96,7 +96,13 @@ Vector random_cos(const Vector& N, int thread_id){
 	return x * T1 + y * T2 + z * N;
 }
 
-
+//Now we need to ensure the proper uniform random distribution across threads using Box-Muller.
+void boxMuller(double stdev, double& x, double& y, int thread_id){
+	double r1 = uniform(engine[thread_id]);
+	double r2 = uniform(engine[thread_id]);
+	x = sqrt(-2.0 * log(r1)) * cos(2.0 * M_PI * r2) * stdev;
+	y = sqrt(-2.0 * log(r1)) * sin(2.0 * M_PI * r2) * stdev;
+}
 
 class Ray {
 public:
@@ -135,8 +141,12 @@ public:
 		//distance to the camera initially remember too. (lecture note for 2nd td.)
 		double t2 = (-b + sqrt(delta)) / 2.0; //check with the professor on this, not too sure on this.
 		if (t2 < 1e-5) return false;
-		//We want the smallest possible t
-		t = (t1 > 1e-5) ? t1 : t2;
+		// //We want the smallest possible t
+		// if (t2 < 0) return false; // Both intersections are behind the camera
+
+		// // We want the smallest positive t
+		// t = (t1 >= 0) ? t1 : t2;
+		t = (t1 > 1e-5) ? t1 : t2; //Should I use 1e-5 or 0?
 		P = ray.O + t * ray.u; // P(t) = O + t*u
 		N = P - C;
 		N.normalize();
@@ -261,7 +271,8 @@ public:
 
 			// test if there is a shadow by sending a new ray
 			// if there is no shadow, compute the formula with dot products etc.
-			Vector L = light_position - (1e-4 * N + P); //restore to original and ask about getting rid of the dsrk edges in mirror. 
+			//CAREFUL.//Vector L = light_position - (1e-4 * N + P); //restore to original and ask about getting rid of the dsrk edges in mirror. 
+			Vector L = light_position - P;  //Restored to original was trying to debug something.
 			double d = L.norm();
 			L.normalize();
 			//Imp: Shadow ray, offset slightly to avoid self-intersection
@@ -271,18 +282,33 @@ public:
 			int object_id_s;
 
 			// If we hit an object and it's closer than the light (t_s < d), we are in shadow, so we need to implement that check here.
+			double visibility = 1.0;
 			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s) && t_s < d) {
-				return Vector(0, 0, 0); // Pitch black shadow I assume?
+				visibility = 0.0; // Pitch black shadow - new addition over the normal return method.
+				//return Vector(0, 0, 0); // Pitch black shadow I assume?
 			}
+			// Compute diffuse shading (Lambertian) - Lab 2 --> include visibility float.
 			double intensity = light_intensity / (4.0 * M_PI * d * d);
 			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
+			Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
 
-			// Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi),  but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so I implemented what seemed more compliant to me.
-			Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
+			// Lab 2 : Add indirect lighting component with a recursive Monte Carlo call
+			// We need to randomly sample the hemisphere using a cosine-weighted distribution
+			Vector indirect_direction = random_cos(N, thread_id);
+			Ray randomRay(P + 1e-4 * N, indirect_direction);
 
-			return diffuse_color;
+			// Due to importance sampling, the Pi and Cos terms mathematically cancel out
+			Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
+
+			// // Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi),  but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so I implemented what seemed more compliant to me.
+			// Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
+
+			//THIS WAS FOR LAB 1.
+			// return diffuse_color;
 
 			// TODO (lab 2) : add indirect lighting component with a recursive call
+			//The methods defined above.
+			return direct_lighting + indirect_lighting;
 		}
 
 
