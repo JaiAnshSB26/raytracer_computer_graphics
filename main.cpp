@@ -165,6 +165,51 @@ public:
 };
 
 
+//Implementation of new classes needed for Lab 3 - I begin with this while understanding the Traingles class.
+
+// class BoundingBox {
+// public:
+// 	BoundingBox() : Bmin(Vector(1e9, 1e9, 1e9)),  Bmax(Vector(-1e9, -1e9, -1e9)) {}
+// 	BoundingBox(const Vector& Bmin, const Vector& Bmax) : Bmin(Bmin), Bmax(Bmax) {}
+// 	Vector Bmin, Bmax;
+
+// 	bool intersect(const Ray& ray, double& t_inter) const {
+// 		double tx0 = (Bmin[0] - ray.O[0]) / ray.u[0];
+// 		double tx1 = 
+// 	}
+// }
+class BoundingBox {
+public:
+	BoundingBox() : Bmin(Vector(1e9, 1e9, 1e9)), Bmax(Vector(-1e9, -1e9, -1e9)) {}
+	BoundingBox(const Vector& Bmin, const Vector& Bmax) : Bmin(Bmin), Bmax(Bmax) {}
+	Vector Bmin, Bmax;
+
+	bool intersect(const Ray& ray, double& t_inter) const {
+		double tx0 = (Bmin[0] - ray.O[0]) / ray.u[0];
+		double tx1 = (Bmax[0] - ray.O[0]) / ray.u[0];
+		if (tx0 > tx1) std::swap(tx0, tx1);
+
+		double ty0 = (Bmin[1] - ray.O[1]) / ray.u[1];
+		double ty1 = (Bmax[1] - ray.O[1]) / ray.u[1];
+		if (ty0 > ty1) std::swap(ty0, ty1);
+
+		double tz0 = (Bmin[2] - ray.O[2]) / ray.u[2];
+		double tz1 = (Bmax[2] - ray.O[2]) / ray.u[2];
+		if (tz0 > tz1) std::swap(tz0, tz1);
+
+		double t0 = std::max(tx0, std::max(ty0, tz0));
+		double t1 = std::min(tx1, std::min(ty1, tz1));
+
+		if (t0 <= t1 && t1 > 0) {
+            t_inter = t0 > 0 ? t0 : t1;
+            return true;
+        }
+        return false;
+	}
+};
+
+
+
 // Class only used in labs 3 and 4 
 class TriangleIndices {
 public:
