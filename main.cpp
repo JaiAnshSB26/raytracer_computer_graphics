@@ -416,6 +416,23 @@ public:
 		return b;
 	}
 
+	Vector compute_barycenter(TriangleIndices t_indices) const {
+		Vector A = vertices[t_indices.vtx[0]];
+		Vector B = vertices[t_indices.vtx[1]];
+		Vector C = vertices[t_indices.vtx[2]];
+		return (A + B + C) / 3.0;  //simple logic, don't complicate the implementations for urself!
+	}
+
+	//Now I implement the get_longest method, which I would need in the main intersect function.
+
+	int get_longest(Vector length) const {
+		if (length[0] > length[1] && length[0] > length[2]) return 0;
+		if (length[1] > legnth[0] && length[1] > length[2]) return 1;
+		return 2; //Note for self: make sure to not confuse and with bitwise and in a rush!
+	}
+
+
+
 
 	bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const {
 		// lab 3 : for each triangle, compute the ray-triangle intersection with Moller-Trumbore algorithm
