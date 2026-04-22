@@ -166,18 +166,6 @@ public:
 
 
 //Implementation of new classes needed for Lab 3 - I begin with this while understanding the Traingles class.
-
-// class BoundingBox {
-// public:
-// 	BoundingBox() : Bmin(Vector(1e9, 1e9, 1e9)),  Bmax(Vector(-1e9, -1e9, -1e9)) {}
-// 	BoundingBox(const Vector& Bmin, const Vector& Bmax) : Bmin(Bmin), Bmax(Bmax) {}
-// 	Vector Bmin, Bmax;
-
-// 	bool intersect(const Ray& ray, double& t_inter) const {
-// 		double tx0 = (Bmin[0] - ray.O[0]) / ray.u[0];
-// 		double tx1 = 
-// 	}
-// }
 class BoundingBox {
 public:
 	BoundingBox() : Bmin(Vector(1e9, 1e9, 1e9)), Bmax(Vector(-1e9, -1e9, -1e9)) {}
@@ -208,7 +196,17 @@ public:
 	}
 };
 
+//Even though we will be implementing the BVHNode class in Lab 4, I am defining it here, now itself for better versioning and readability.
+class BVHNode {
+public:
+	BoundingBox bbox;
+	int starting_triangle;
+	int ending_triangle;
+	BVHNode* child_left;
+	BVHNode* child_right;
 
+	BVHNode() : child_left(nullptr), child_right(nullptr) {}
+};
 
 // Class only used in labs 3 and 4 
 class TriangleIndices {
@@ -228,7 +226,9 @@ public:
 // Class only used in labs 3 and 4 
 class TriangleMesh : public Object {
 public:
-	TriangleMesh(const Vector& albedo, bool mirror = false, bool transparent = false) : ::Object(albedo, mirror, transparent) {};
+	TriangleMesh(const Vector& albedo, bool mirror = false, bool transparent = false) : ::Object(albedo, mirror, transparent) {
+        root = new BVHNode();
+    };
 
 	// first scale and then translate the current object
 	void scale_translate(double s, const Vector& t) {
@@ -352,6 +352,47 @@ public:
 				}
 			}
 		}
+	}
+
+	void init_bvh() {   //Again not needed for now but I am defining it here for the sake of completeness.
+		build_bvh(root, 0, indices.size());
+	}
+
+	bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id) const {
+		TriangleIndices t_indices = indices[triangle_id];
+		Vector A = vertices[t_indices.vtx[0]];
+		Vector B = vertices[t_indices.vtx[1]];
+		Vector C = vertices[t_indices.vtx[2]];
+		//take the differences?
+		Vector e1 = B - A;
+		Vector e2 = C - A;
+		Vector N_unormalized = cross(e1, e2);
+		//IMP note to self - double, don't use float by mistake here again, it would blow up the code during compilation again and you won't be able to locate the error!
+		double beta = dot(e2, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
+		double gamma = -dot(e1, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
+		double alpha = 1 - beta - gamma;
+
+		//if (alpha < 0 || alpha > 1 && beta < 0 || beta > 1 && gamma < 0 || gamma > 1) return false;
+		if (alpha < 0 || alpha > 1 || beta < 0 || beta > 1 || gamma < 0 || gamma > 1) return false;
+
+		double t_cur = dot(A - ray.O, N_unormalized) / dot(ray.u, N_unormalized);
+		if (t_cur < 1e-5) return false;
+		
+		t = t_cur;
+		P = ray.O + t * ray.u;
+		
+		if (normals.size() > 0) {
+			Vector normalA = normals[t_indices.n[0]];
+			Vector normalB = normals[t_indices.n[1]];
+			Vector normalC = normals[t_indices.n[2]];
+			N = alpha * normalA + beta * normalB + gamma * normalC;
+			N.normalize();
+		} else {
+			N = N_unormalized;
+			N.normalize();
+		}
+		
+		return true;
 	}
 
 	bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const {
