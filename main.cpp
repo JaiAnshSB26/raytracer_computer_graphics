@@ -386,7 +386,7 @@ public:
 			Vector normalB = normals[t_indices.n[1]];
 			Vector normalC = normals[t_indices.n[2]];
 			N = alpha * normalA + beta * normalB + gamma * normalC;
-			N.normalize();
+			N.normalize(); //Note for self: Don't forget to normalize...
 		} else {
 			N = N_unormalized;
 			N.normalize();
@@ -394,6 +394,28 @@ public:
 		
 		return true;
 	}
+
+	BoundingBox compute_bbox(int starting_triangle, int endin_trangle) const {
+		BoundingBox b;
+		for (int i = starting_triangle; i < ending_triangle; i++){
+			TriangleIndices t_indices = indices[i];
+			Vector A = vertices[t_indices.vtx[0]];
+			Vector B = vertices[t_indices.vtx[1]];
+			Vector C = vertices[t_indices.vtx[2]];
+
+			//The mins...
+			b.Bmin[0] = std::min(b.Bmin[0], std::min(A[0], std::min(B[0], C[0])));
+			b.Bmin[1] = std::min(b.Bmin[1], std::min(A[1], std::min(B[1], C[1])));
+			b.Bmin[2] = std::min(b.Bmin[2], std::min(A[2], std::min(B[2], C[2])));
+
+			//Now the maxs...
+			b.Bmax[0] = std::max(b.Bmax[0], std::max(A[0], std::max(B[0], C[0])));
+			b.Bmax[1] = std::max(b.Bmax[1], std::max(A[1], std::max(B[1], C[1])));
+			b.Bmax[2] = std::max(b.Bmax[2], std::max(A[2], std::max(B[2], C[2])));
+		}
+		return b;
+	}
+
 
 	bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const {
 		// lab 3 : for each triangle, compute the ray-triangle intersection with Moller-Trumbore algorithm
