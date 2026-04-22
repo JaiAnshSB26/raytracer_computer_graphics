@@ -228,45 +228,33 @@ public:
 				return getColor(R_ray, recursion_depth + 1);
 			} // else
 
-			if (objects[object_id]->transparent) { // optional
+			if (objects[object_id]->transparent) { // optional - fianlly implemented and it works!
+				double n1 = 1.0;
+				double n2 = 1.5;
+				Vector N_real = N;
 
-				// return getColor in the refraction direction, with recursion_depth+1 (recursively)
-				//Note: I did this at the beginning of lab 2, since I was really curious about this!
-				//It is implemented using my favourite principles - the Snell-Descartes law, comncept of Total Internal Reflection, Fresnel's law/Schlick's approximation and a hint of Russian roulette as given on pg 21!
-				// double n1 = 1.0; // Air
-				// double n2 = 1.5; // Glass
-				// Vector N_real = N;
+				if (dot(ray.u, N) > 0) {
+					std::swap(n1, n2);
+					N_real = -1.0 * N;
+				}
 
-				// // If we are exiting the sphere, we must flip the normal and indices of refraction?
-				
-				// if (dot(ray.u, N) > 0) {
-				// 	std::swap(n1, n2);
-				// 	N_real = N * -1.0;
-				// // } else {
-				// // 	cos_i = -cos_i;
-				// // }
-				// }
-				// // Cosine of incidence angle (dot_u_N is guaranteed to be <= 0)
-				// double dot_u_N = dot(ray.u, N_real);
-				// double cos_i = -dot_u_N; // Positive value for Fresnel formula
-				// //Now the TIR
-				// double rad = 1.0 - sqr(n1 / n2) * (1.0 - sqr(cos_i));
-				// Vector reflected_dir = ray.u - 2.0 * dot_u_N * N_real;
-				
-				// // Schlick's approximation for Fresnel reflection
-				// double k0 = sqr((n1 - n2) / (n1 + n2));
-				// double R = k0 + (1.0 - k0) * pow(1.0 - cos_i, 5);
-
-				// //We use random number to simulate partial reflection/refraction
-				// if (rad < 0 || uniform(engine[0]) < R) {
-				// 	return getColor(Ray(P + 1e-4 * N_real, reflected_dir), recursion_depth + 1);
-				// } else { // Refraction 
-				// 	// exact math from the lecture slides now:
-				// 	Vector wTt = (ray.u - dot_u_N * N_real) * (n1 / n2); 
-				// 	Vector wNt = N_real * (-sqrt(rad));
-				// 	Vector refracted_dir = wTt + wNt;
-				// 	return getColor(Ray(P - 1e-4 * N_real, refracted_dir), recursion_depth + 1);
-				// }
+				double dot_u_N = dot(ray.u, N_real);
+				double cos_i = -dot_u_N;
+				double rad = 1.0 - sqr(n1 / n2) * (1.0 - sqr(cos_i));
+				Vector reflected_dir = ray.u - 2.0 * dot_u_N * N_real;
+				if (rad < 0) {
+					return getColor(Ray(P + 1e-4 * N_real, reflected_dir), recursion_depth + 1, thread_id);
+				}
+				double k0 = sqr((n1 - n2) / (n1 + n2));
+				double R_fresnel = k0 + (1.0 - k0) * pow(1.0 - cos_i, 5.0);
+				if (uniform(engine[thread_id]) < R_fresnel) {
+					return getColor(Ray(P + 1e-4 * N_real, reflected_dir), recursion_depth + 1, thread_id);
+				} else {
+					Vector wTt = (n1 / n2) * (ray.u - dot_u_N * N_real);
+					Vector wNt = -1.0 * N_real * sqrt(rad);
+					Vector refracted_dir = wTt + wNt;
+					return getColor(Ray(P - 1e-4 * N_real, refracted_dir), recursion_depth + 1, thread_id);
+				}
 			} // else
 
 			// test if there is a shadow by sending a new ray
