@@ -12,6 +12,8 @@
 #include <string>
 #include <fstream>
 //New imports done for Lab 3
+//Needed for some Lab 3/4 methods - 
+#include <list>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -395,7 +397,7 @@ public:
 		return true;
 	}
 
-	BoundingBox compute_bbox(int starting_triangle, int endin_trangle) const {
+	BoundingBox compute_bbox(int starting_triangle, int ending_triangle) const {
 		BoundingBox b;
 		for (int i = starting_triangle; i < ending_triangle; i++){
 			TriangleIndices t_indices = indices[i];
@@ -427,18 +429,86 @@ public:
 
 	int get_longest(Vector length) const {
 		if (length[0] > length[1] && length[0] > length[2]) return 0;
-		if (length[1] > legnth[0] && length[1] > length[2]) return 1;
+		if (length[1] > length[0] && length[1] > length[2]) return 1;
 		return 2; //Note for self: make sure to not confuse and with bitwise and in a rush!
 	}
 
+	//Method for lab 4 I guess, but I kept running into compilation errors, so I thought maybe including this and changing all relevant function attributes at once might be a good idea!
+	void build_bvh(BVHNode* node, int starting_triangle, int ending_triangle) {
+		node->bbox = compute_bbox(starting_triangle, ending_triangle);
+		node->starting_triangle = starting_triangle;
+		node->ending_triangle = ending_triangle;
 
+		Vector diag = node->bbox.Bmax - node->bbox.Bmin;
+		Vector middle_diag = node->bbox.Bmin + diag * 0.5;
+		int longest_axis = get_longest(diag);
+
+		int pivot_index = starting_triangle;
+		for (int i = starting_triangle; i < ending_triangle; i++) { //we have to loop over and calculate it for every isntance.
+			Vector barycenter = compute_barycenter(indices[i]);
+			if (barycenter[longest_axis] < middle_diag[longest_axis]) {
+				std::swap(indices[i], indices[pivot_index]);
+				pivot_index++;
+			}
+		}
+        //if (pivot_index >= starting_triangle && pivot_index >= ending_triangle && ending_triangle - starting_triangle < 8) return;
+		if (pivot_index <= starting_triangle || pivot_index >= ending_triangle || ending_triangle - starting_triangle < 5) return;
+
+		node->child_left = new BVHNode();
+		node->child_right = new BVHNode();
+		
+		build_bvh(node->child_left, starting_triangle, pivot_index); //Recursive function as was instructed for the 3 rd to-do in the descriptions for Lab 3 and Lab 4!
+		build_bvh(node->child_right, pivot_index, ending_triangle);
+	}
 
 
 	bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const {
-		// lab 3 : for each triangle, compute the ray-triangle intersection with Moller-Trumbore algorithm
-		// lab 3 : once done, speed it up by first checking against the mesh bounding box
-		// lab 4 : recursively apply the bounding-box test from a BVH datastructure
-		return false;
+		// lab 3 : for each triangle, compute the ray-triangle intersection with Moller-Trumbore algorithm - implemented above and used here.
+		// lab 3 : once done, speed it up by first checking against the mesh bounding box - implemented above and used here.
+		// lab 4 (I would do it in lab 3 since I might mess up later.): recursively apply the bounding-box test from a BVH datastructure - for the sake of completeness of the problem and me not messing up in the future I have implemented tits and bits of it right now as well.
+		double temp_t;
+		if (!root->bbox.intersect(ray, temp_t)) return false;
+
+		std::list<BVHNode*> nodes_to_visit;
+		nodes_to_visit.push_front(root);
+
+		double best_inter_distance = 1e9;
+		bool found_intersection = false;
+
+		while (!nodes_to_visit.empty()) {
+			BVHNode* curNode = nodes_to_visit.back();
+			nodes_to_visit.pop_back();
+
+			if (curNode->child_left) {
+				double inter_distance;
+				if (curNode->child_left->bbox.intersect(ray, inter_distance)) {
+					if (inter_distance < best_inter_distance) {
+						nodes_to_visit.push_back(curNode->child_left);  //I made bit of mess out of push_back method, some text on StackOverflow really helped me here.
+					}
+				}
+				if (curNode->child_right->bbox.intersect(ray, inter_distance)) {
+					if (inter_distance < best_inter_distance) {
+						nodes_to_visit.push_back(curNode->child_right);
+					}
+				}
+			} else {
+				for (int i = curNode->starting_triangle; i < curNode->ending_triangle; i++) {
+					Vector P_cur, N_cur;
+					double t_cur;
+					if (TriangleIntersect(ray, P_cur, t_cur, N_cur, i)) {
+						if (t_cur < best_inter_distance) {
+							best_inter_distance = t_cur;
+							P = P_cur;
+							N = N_cur;
+							t = t_cur;
+							found_intersection = true;
+						}
+					}
+				}
+			}
+		}
+		return found_intersection;
+		//return false;
 	}
 
 	std::vector<TriangleIndices> indices;
@@ -446,6 +516,7 @@ public:
 	std::vector<Vector> normals;
 	std::vector<Vector> uvs;
 	std::vector<Vector> vertexcolors;
+	BVHNode* root;
 };
 
 
@@ -615,9 +686,12 @@ int main() {
 
 	// Create 3 spheres at different depths to demonstrate Depth of Field
 	//Light intensity slightly darker because there are pure whites at many place - (darker or albedo smaller.)
-	Sphere sphere_front(Vector(-12, 0, 25), 10., Vector(0.8, 0.3, 0.8), false); // Magenta - Blurry (Too close)
-	Sphere sphere_middle(Vector(0, 0, 0), 10., Vector(0.9, 0.9, 0.9), false);   // White - Sharp (At focal distance)
-	Sphere sphere_back(Vector(12, 0, -25), 10., Vector(0.2, 0.5, 0.8), true, false);  // Blue - Blurry (Too far)
+
+	//Comment these out for Lab 3 or 4.
+
+	// Sphere sphere_front(Vector(-12, 0, 25), 10., Vector(0.8, 0.3, 0.8), false); // Magenta - Blurry (Too close)
+	// Sphere sphere_middle(Vector(0, 0, 0), 10., Vector(0.9, 0.9, 0.9), false, true);   // White - Sharp (At focal distance)
+	// Sphere sphere_back(Vector(12, 0, -25), 10., Vector(0.2, 0.5, 0.8), true, false);  // Blue - Blurry (Too far)
 
 	Sphere wall_left(Vector(-1000, 0, 0), 940, Vector(0.5, 0.8, 0.1));
 	Sphere wall_right(Vector(1000, 0, 0), 940, Vector(0.9, 0.2, 0.3));
@@ -626,20 +700,26 @@ int main() {
 	Sphere ceiling(Vector(0, 1000, 0), 940, Vector(0.3, 0.5, 0.3));
 	Sphere floor(Vector(0, -1000, 0), 990, Vector(0.6, 0.5, 0.7));
 
+	//Be careful of the point of intersection and then it should normalize into the right thing when you are happy with it.
+	TriangleMesh cat(Vector(0.8, 0.8, 0.8));
+	cat.readOBJ("cat.obj");
+    cat.scale_translate(0.6, Vector(0, -10, 0));
+    cat.init_bvh();
+
 	Scene scene;
 	scene.camera_center = Vector(0, 0, 55); //Change in lecture.
 	scene.light_position = Vector(-10,20,40);
-	scene.light_intensity = 3E7;
-	scene.fov = 60 * M_PI / 180.;
+	scene.light_intensity = 6E6; //3E7
+	scene.fov = 60 * M_PI / 180.;  //I had previously set it to 55 * M_PI / 180.; too.
 	scene.gamma = 2.2;    // TODO (lab 1) : play with gamma ; typically, gamma = 2.2
 	scene.max_light_bounce = 5;
 
 	//Comment out the single sphere for now.
 	//scene.addObject(&center_sphere);
 
-	scene.addObject(&sphere_front);
-	scene.addObject(&sphere_middle);
-	scene.addObject(&sphere_back);
+	// scene.addObject(&sphere_front);
+	// scene.addObject(&sphere_middle);
+	// scene.addObject(&sphere_back);
 
 	scene.addObject(&wall_left);
 	scene.addObject(&wall_right);
@@ -648,9 +728,13 @@ int main() {
 	scene.addObject(&ceiling);
 	scene.addObject(&floor);
 	
+	//We msut add one for Mr. Cat too!
+	scene.addObject(&cat);
 
 	std::vector<unsigned char> image(W * H * 3, 0);
 
+
+//
 #pragma omp parallel for schedule(dynamic, 1)
 	for (int i = 0; i < H; i++) {
 		int thread_id = omp_get_thread_num(); // Thread safety for random generator engine
@@ -673,7 +757,7 @@ int main() {
 				ray_direction.normalize();
 
 				// Depth of field implementation - It was mentioned optional on the slides but I still wanted to implement it...
-				double aperture_radius = 3.0; // The larger the radius, the stronger the DoF blur I assume...
+				double aperture_radius = 3.0; //Depth of Field - // The larger the radius, the stronger the DoF blur I assume...
 				double focus_distance = 55.0; // Distance to the center_sphere (from Z=55 to Z=0....I f I remember correctly...)
 				
 				double t_focus = focus_distance / std::abs(ray_direction[2]);
@@ -688,12 +772,14 @@ int main() {
 				Vector new_direction = focal_point - new_origin;
 				new_direction.normalize();
 
-				Ray ray(new_origin, new_direction);
+				//Commented out before Lab 3/4 - just for ease of notation.
+				// Ray ray(new_origin, new_direction);
 
-
+				//Old junk ray.
 				// Ray ray(scene.camera_center, ray_direction);
 
-				pixelColor = pixelColor + scene.getColor(ray, 0, thread_id);
+				// pixelColor = pixelColor + scene.getColor(ray, 0, thread_id);
+				pixelColor = pixelColor + scene.getColor(Ray(new_origin, new_direction), 0, thread_id);
 			}
 
 			// Average color from total paths
@@ -704,7 +790,7 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(pixelColor[2] / 255., 1. / scene.gamma)));
 		}
 	}
-	stbi_write_png("image.png", W, H, 3, &image[0], 0);
+	stbi_write_png("image_lab3_3.png", W, H, 3, &image[0], 0);
 
 	return 0;
 }

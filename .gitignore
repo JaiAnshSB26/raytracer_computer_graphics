@@ -6,6 +6,7 @@
 # Compiled object files
 *.o
 *.obj
+!cat.obj
 
 #Backup files.
 main_backup.cpp
