@@ -25,7 +25,6 @@
 #define M_PI 3.14159265358979323856
 #endif
 
-// I did want to use using namespace std; but I was afraid it was going to mess me up, so I just used std:: everywhere.
 static std::default_random_engine engine[32];
 static std::uniform_real_distribution<double> uniform(0, 1);
 
@@ -124,8 +123,7 @@ class Object {
 public:
 	Object(const Vector& albedo, bool mirror = false, bool transparent = false) : albedo(albedo), mirror(mirror), transparent(transparent) {};
 
-	// virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const = 0;
-	virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N, Vector& hit_albedo) const = 0;
+	virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const = 0;
 
 	Vector albedo;
 	bool mirror, transparent;
@@ -139,10 +137,8 @@ public:
 	// if there is an intersection, also computes the point of intersection P, 
 	// t>=0 the distance between the ray origin and P (i.e., the parameter along the ray)
 	// and the unit normal N
-	// bool intersect(const Ray& ray, Vector& P, double &t, Vector& N) const {
-	bool intersect(const Ray& ray, Vector& P, double &t, Vector& N, Vector& hit_albedo) const { //trying to implement the texture.
-		hit_albedo = this->albedo; //for the optional texture paert. 
-		// TODO (lab 1) : compute the intersection (just true/false at the begining of lab 1, then P, t and N as well)
+	bool intersect(const Ray& ray, Vector& P, double &t, Vector& N) const {
+		 // TODO (lab 1) : compute the intersection (just true/false at the begining of lab 1, then P, t and N as well)
 		Vector L = ray.O - C;
 		double b = 2 * dot(ray.u, L);
 		double c = dot(L, L) - R * R;
@@ -169,6 +165,7 @@ public:
 	double R;
 	Vector C;
 };
+
 
 //Implementation of new classes needed for Lab 3 - I begin with this while understanding the Traingles class.
 class BoundingBox {
@@ -362,49 +359,7 @@ public:
 		build_bvh(root, 0, indices.size());
 	}
 
-	// bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id) const {
-	// 	TriangleIndices t_indices = indices[triangle_id];
-	// 	Vector A = vertices[t_indices.vtx[0]];
-	// 	Vector B = vertices[t_indices.vtx[1]];
-	// 	Vector C = vertices[t_indices.vtx[2]];
-	// 	//take the differences?
-	// 	Vector e1 = B - A;
-	// 	Vector e2 = C - A;
-	// 	Vector N_unormalized = cross(e1, e2);
-	// 	//IMP note to self - double, don't use float by mistake here again, it would blow up the code during compilation again and you won't be able to locate the error!
-	// 	double beta = dot(e2, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
-	// 	double gamma = -dot(e1, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
-	// 	double alpha = 1 - beta - gamma;
-
-	// 	//if (alpha < 0 || alpha > 1 && beta < 0 || beta > 1 && gamma < 0 || gamma > 1) return false;
-	// 	if (alpha < 0 || alpha > 1 || beta < 0 || beta > 1 || gamma < 0 || gamma > 1) return false;
-
-	// 	double t_cur = dot(A - ray.O, N_unormalized) / dot(ray.u, N_unormalized);
-	// 	if (t_cur < 1e-5) return false;
-		
-	// 	t = t_cur;
-	// 	P = ray.O + t * ray.u;
-		
-	// 	//Interpolate normals if available.
-	// 	if (normals.size() > 0) {
-	// 		Vector normalA = normals[t_indices.n[0]];
-	// 		Vector normalB = normals[t_indices.n[1]];
-	// 		Vector normalC = normals[t_indices.n[2]];
-	// 		N = alpha * normalA + beta * normalB + gamma * normalC;
-	// 		N.normalize(); //Note for self: Don't forget to normalize...
-	// 	} else {
-	// 		N = N_unormalized;
-	// 		N.normalize();
-	// 	}
-
-	// 	//Get the initial rigid look by ignoring interpolated vertex normals (I realised I had generated no pictures with the rigid look before smoothening using interpolation so I added this in later).
-	// 	// N = N_unormalized;
-	// 	// N.normalize();
-		
-	// 	return true;
-	// }
-
-	bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id, Vector& hit_albedo) const {
+	bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id) const {
 		TriangleIndices t_indices = indices[triangle_id];
 		Vector A = vertices[t_indices.vtx[0]];
 		Vector B = vertices[t_indices.vtx[1]];
@@ -427,6 +382,7 @@ public:
 		t = t_cur;
 		P = ray.O + t * ray.u;
 		
+		//Interpolate normals if available.
 		if (normals.size() > 0) {
 			Vector normalA = normals[t_indices.n[0]];
 			Vector normalB = normals[t_indices.n[1]];
@@ -437,27 +393,10 @@ public:
 			N = N_unormalized;
 			N.normalize();
 		}
-		
-		if (texture_data && t_indices.uv[0] >= 0) {
-			Vector uvA = uvs[t_indices.uv[0]];
-			Vector uvB = uvs[t_indices.uv[1]];
-			Vector uvC = uvs[t_indices.uv[2]];
-			Vector UV = alpha * uvA + beta * uvB + gamma * uvC;
-			
-			double u = UV[0] - floor(UV[0]);
-			double v = UV[1] - floor(UV[1]);
-			if (u < 0) u += 1.0;
-			if (v < 0) v += 1.0;
-			
-			int tx = std::min(std::max((int)(u * tex_W), 0), tex_W - 1);
-			int ty = std::min(std::max((int)((1.0 - v) * tex_H), 0), tex_H - 1); // Flip Y to match standard OBJ
-			int idx = (ty * tex_W + tx) * 3;
-			hit_albedo = Vector(std::pow(texture_data[idx] / 255.0, 2.2), 
-			                    std::pow(texture_data[idx+1] / 255.0, 2.2), 
-			                    std::pow(texture_data[idx+2] / 255.0, 2.2)); // Gamma correction!
-		} else {
-			hit_albedo = this->albedo;
-		}
+
+		//Get the initial rigid look by ignoring interpolated vertex normals (I realised I had generated no pictures with the rigid look before smoothening using interpolation so I added this in later).
+		// N = N_unormalized;
+		// N.normalize();
 		
 		return true;
 	}
@@ -582,14 +521,6 @@ public:
 	std::vector<Vector> uvs;
 	std::vector<Vector> vertexcolors;
 	BVHNode* root;
-
-	unsigned char* texture_data = nullptr;
-	int tex_W = 0, tex_H = 0, tex_channels = 0;
-
-	void loadTexture(const char* map_file) {
-		texture_data = stbi_load(map_file, &tex_W, &tex_H, &tex_channels, 3);
-		if (!texture_data) printf("Texture failed to load!\n");
-	}
 };
 
 
@@ -639,10 +570,10 @@ public:
 		// TODO (lab 1) : if intersect with ray, use the returned information to compute the color ; otherwise black 
 		// in lab 1, the color only includes direct lighting with shadows
 
-		Vector P, N, hit_albedo;
+		Vector P, N;
 		double t;
 		int object_id;
-		if (intersect(ray, P, t, N, object_id, hit_albedo)) {
+		if (intersect(ray, P, t, N, object_id)) {
 
 			if (objects[object_id]->mirror) {
 				Vector R = ray.u - 2.0 * dot(ray.u, N) * N;
@@ -693,26 +624,24 @@ public:
 			int object_id_s;
 
 			// If we hit an object and it's closer than the light (t_s < d), we are in shadow, so we need to implement that check here.
-			Vector dummy_albedo; //for the optional texture part.
 			double visibility = 1.0;
-			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s, dummy_albedo) && t_s < d) {
+			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s) && t_s < d) {
 				visibility = 0.0; // Pitch black shadow - new addition over the normal return method.
 				//return Vector(0, 0, 0); // Pitch black shadow I assume?
 			}
 			// Compute diffuse shading (Lambertian) - Lab 2 --> include visibility float.
 			double intensity = light_intensity / (4.0 * M_PI * d * d);
 			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
-			//Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
-			Vector direct_lighting = hit_albedo * (intensity * diffuse_factor * visibility / M_PI);
+			Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
+
 			// Lab 2 : Add indirect lighting component with a recursive Monte Carlo call
 			// We need to randomly sample the hemisphere using a cosine-weighted distribution
 			Vector indirect_direction = random_cos(N, thread_id);
 			Ray randomRay(P + 1e-4 * N, indirect_direction);
 			// Ray randomRay(P + 1e-4 * N, indirect_direction);
 			// Only sum the indirect lighting if we haven't hit max recursion
-			//Incorporate the changes for the texture part now.
 			if (recursion_depth + 1 < max_light_bounce) {
-				Vector indirect_lighting = hit_albedo * getColor(randomRay, recursion_depth + 1, thread_id);
+				Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
 				return direct_lighting + indirect_lighting;
 			}
 			return direct_lighting;
@@ -776,15 +705,9 @@ int main() {
 	Sphere floor(Vector(0, -1000, 0), 990, Vector(0.6, 0.5, 0.7));
 
 	//Be careful of the point of intersection and then it should normalize into the right thing when you are happy with it.
-	// TriangleMesh cat(Vector(0.8, 0.8, 0.8));
-	// cat.readOBJ("cat.obj");
-    // cat.scale_translate(0.6, Vector(0, -10, 0)); // as suggested by Prof. Bonneel in class.
-    // cat.init_bvh();
-	//Load for the optional version now.
 	TriangleMesh cat(Vector(0.8, 0.8, 0.8));
-    cat.readOBJ("cat.obj");
-    cat.scale_translate(0.6, Vector(0, -10, 0)); 
-    cat.loadTexture("cat_diff.png"); // from the 2D thing we have to laod this for the texture.
+	cat.readOBJ("cat.obj");
+    cat.scale_translate(0.6, Vector(0, -10, 0)); // as suggested by Prof. Bonneel in class.
     cat.init_bvh();
 
 	Scene scene;
