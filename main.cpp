@@ -142,20 +142,20 @@ public:
 		Vector L = ray.O - C;
 		double b = 2 * dot(ray.u, L);
 		double c = dot(L, L) - R * R;
-		//self - note: check the definition on the slides once again, don't rely on your goldfish memory alone.
+		//self - note: check the definition on the slides once again.
 		double delta = b * b - 4 * c;
 		if (delta < 0) return false;
 		double t1 = (-b - sqrt(delta)) / 2.0; //check if t1 or t2 is positive or not too (note from the lecture.)
 		//smallest is t1,  from the thing but we want the smallest positive one.
 		//distance to the camera initially remember too. (lecture note for 2nd td.)
-		double t2 = (-b + sqrt(delta)) / 2.0; //check with the professor on this, not too sure on this.
+		double t2 = (-b + sqrt(delta)) / 2.0;
 		if (t2 < 1e-5) return false;
 		// //We want the smallest possible t
 		// if (t2 < 0) return false; // Both intersections are behind the camera
 
 		// // We want the smallest positive t
 		// t = (t1 >= 0) ? t1 : t2;
-		t = (t1 > 1e-5) ? t1 : t2; //Should I use 1e-5 or 0?
+		t = (t1 > 1e-5) ? t1 : t2; // 1e-5 or 0, careful consideration at initial stages.
 		P = ray.O + t * ray.u; // P(t) = O + t*u
 		N = P - C;
 		N.normalize();
@@ -167,7 +167,7 @@ public:
 };
 
 
-//Implementation of new classes needed for Lab 3 - I begin with this while understanding the Traingles class.
+//Implementation of new classes needed for Lab 3-4.
 class BoundingBox {
 public:
 	BoundingBox() : Bmin(Vector(1e9, 1e9, 1e9)), Bmax(Vector(-1e9, -1e9, -1e9)) {}
@@ -355,7 +355,7 @@ public:
 		}
 	}
 
-	void init_bvh() {   //Again not needed for now but I am defining it here for the sake of completeness.
+	void init_bvh() { //Lab 4 (3+4)
 		build_bvh(root, 0, indices.size());
 	}
 
@@ -364,16 +364,15 @@ public:
 		Vector A = vertices[t_indices.vtx[0]];
 		Vector B = vertices[t_indices.vtx[1]];
 		Vector C = vertices[t_indices.vtx[2]];
-		//take the differences?
+		//take the differences.
 		Vector e1 = B - A;
 		Vector e2 = C - A;
 		Vector N_unormalized = cross(e1, e2);
-		//IMP note to self - double, don't use float by mistake here again, it would blow up the code during compilation again and you won't be able to locate the error!
+		//IMP note to self - double, don't use float by mistake here again.
 		double beta = dot(e2, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
 		double gamma = -dot(e1, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
 		double alpha = 1 - beta - gamma;
 
-		//if (alpha < 0 || alpha > 1 && beta < 0 || beta > 1 && gamma < 0 || gamma > 1) return false;
 		if (alpha < 0 || alpha > 1 || beta < 0 || beta > 1 || gamma < 0 || gamma > 1) return false;
 
 		double t_cur = dot(A - ray.O, N_unormalized) / dot(ray.u, N_unormalized);
@@ -409,12 +408,12 @@ public:
 			Vector B = vertices[t_indices.vtx[1]];
 			Vector C = vertices[t_indices.vtx[2]];
 
-			//The mins...
+			//The mins.
 			b.Bmin[0] = std::min(b.Bmin[0], std::min(A[0], std::min(B[0], C[0])));
 			b.Bmin[1] = std::min(b.Bmin[1], std::min(A[1], std::min(B[1], C[1])));
 			b.Bmin[2] = std::min(b.Bmin[2], std::min(A[2], std::min(B[2], C[2])));
 
-			//Now the maxs...
+			//Now the maxs.
 			b.Bmax[0] = std::max(b.Bmax[0], std::max(A[0], std::max(B[0], C[0])));
 			b.Bmax[1] = std::max(b.Bmax[1], std::max(A[1], std::max(B[1], C[1])));
 			b.Bmax[2] = std::max(b.Bmax[2], std::max(A[2], std::max(B[2], C[2])));
@@ -426,7 +425,7 @@ public:
 		Vector A = vertices[t_indices.vtx[0]];
 		Vector B = vertices[t_indices.vtx[1]];
 		Vector C = vertices[t_indices.vtx[2]];
-		return (A + B + C) / 3.0;  //simple logic, don't complicate the implementations for urself!
+		return (A + B + C) / 3.0; //complete this later first.
 	}
 
 	//Now I implement the get_longest method, which I would need in the main intersect function.
@@ -434,10 +433,9 @@ public:
 	int get_longest(Vector length) const {
 		if (length[0] > length[1] && length[0] > length[2]) return 0;
 		if (length[1] > length[0] && length[1] > length[2]) return 1;
-		return 2; //Note for self: make sure to not confuse and with bitwise and in a rush!
+		return 2; //Note for self: make sure to not confuse and with bitwise and in a rush, in C++ again.
 	}
 
-	//Method for lab 4 I guess, but I kept running into compilation errors, so I thought maybe including this and changing all relevant function attributes at once might be a good idea!
 	void build_bvh(BVHNode* node, int starting_triangle, int ending_triangle) {
 		node->bbox = compute_bbox(starting_triangle, ending_triangle);
 		node->starting_triangle = starting_triangle;
@@ -455,7 +453,6 @@ public:
 				pivot_index++;
 			}
 		}
-        //if (pivot_index >= starting_triangle && pivot_index >= ending_triangle && ending_triangle - starting_triangle < 8) return;
 		if (pivot_index <= starting_triangle || pivot_index >= ending_triangle || ending_triangle - starting_triangle < 5) return;
 
 		node->child_left = new BVHNode();
@@ -512,7 +509,6 @@ public:
 			}
 		}
 		return found_intersection;
-		//return false;
 	}
 
 	std::vector<TriangleIndices> indices;
@@ -613,11 +609,11 @@ public:
 
 			// test if there is a shadow by sending a new ray
 			// if there is no shadow, compute the formula with dot products etc.
-			//CAREFUL.//Vector L = light_position - (1e-4 * N + P); //restore to original and ask about getting rid of the dsrk edges in mirror. 
+			//Note for self - CAREFUL.//Vector L = light_position - (1e-4 * N + P); //restore to original and ask about getting rid of the dsrk edges in mirror. 
 			Vector L = light_position - P;  //Restored to original was trying to debug something.
 			double d = L.norm();
 			L.normalize();
-			//Imp: Shadow ray, offset slightly to avoid self-intersection
+			//Imp: (Debugging advise from Prof. during the TD) Shadow ray, offset slightly to avoid self-intersection.
 			Ray shadow_ray(P + 1e-4 * N, L);
 			Vector P_s, N_s;
 			double t_s;
@@ -629,7 +625,7 @@ public:
 				visibility = 0.0; // Pitch black shadow - new addition over the normal return method.
 				//return Vector(0, 0, 0); // Pitch black shadow I assume?
 			}
-			// Compute diffuse shading (Lambertian) - Lab 2 --> include visibility float.
+			// Compute diffuse shading (Lambertian), Lab 2, include visibility float.
 			double intensity = light_intensity / (4.0 * M_PI * d * d);
 			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
 			Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
@@ -646,11 +642,7 @@ public:
 			}
 			return direct_lighting;
 
-			// Due to importance sampling, the Pi and Cos terms mathematically cancel out
-			// Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
-
-			// // Note: Sir, I panicked a bit and couldn't recall this properly, according to me - Color = Intensity * Cos(theta) * (Albedo / Pi),  but as per notes eq: L = (I / 4*pi*d^2) * (rho / pi) * max(0, <N, w_i>), so I implemented what seemed more compliant to me.
-			// Vector diffuse_color = objects[object_id]->albedo * (intensity * diffuse_factor / M_PI);
+			// Due to importance sampling, the Pi and Cos terms mathematically cancel out I guess.
 
 			//THIS WAS FOR LAB 1.
 			// return diffuse_color;
@@ -659,7 +651,6 @@ public:
 			//The methods defined above.
 			//return direct_lighting + indirect_lighting; - Test out first.
 		}
-
 
 
 		return Vector(0, 0, 0);
@@ -681,7 +672,7 @@ int main() {
 		engine[i].seed(i);
 	}
 
-	//I commented out the testing for the Lab 1 transparency part for now, since that is completely messign up.
+	//I commented out the testing for the Lab 1-2 transparency part for future labs.
 	// Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), false);
 	//Sphere center_sphere(Vector(0, 0, 0), 10., Vector(0.8, 0.8, 0.8), true, false); //check from the original.
 	
@@ -776,9 +767,6 @@ int main() {
 				Vector new_direction = focal_point - new_origin;
 				new_direction.normalize();
 
-				//Commented out before Lab 3/4 - just for ease of notation.
-				// Ray ray(new_origin, new_direction);
-
 				//Old junk ray.
 				// Ray ray(scene.camera_center, ray_direction);
 
@@ -799,45 +787,7 @@ int main() {
 	return 0;
 }
 
-// Non-multi-threaded initial partial code - with the initial class intructions.
-// #pragma omp parallel for schedule(dynamic, 1)
-// 	for (int i = 0; i < H; i++) {
-// 		int thread_id = omp_get_thread_num(); // I try to add thread safety for random generator engine, I hope it works.
-// 		for (int j = 0; j < W; j++) {
-// 			Vector color;
-
-// 			// TODO (lab 1) : correct ray_direction so that it goes through each pixel (j, i)			
-// 			double x = j - W / 2.0 + 0.5; //Center horizontal pixel mapping.
-// 			double y = H / 2.0 - i - 0.5; //Center the vertical mapping (basically invert the y-axis like explained int he class.)
-// 			double z = -W / (2.0 * tan(scene.fov / 2.0)); //Map focal lenght via W and FOV.
-// 			//New Ray and new origin remember.
-			
-// 			// Vector ray_direction(0., 0., -1); - Added the real x, y, z computed values now.
-// 			Vector ray_direction(x, y, z);
-// 			//Adding the ray direction normalization here too.
-// 			ray_direction.normalize(); //we must ensure that the lenght is exactly 1 (reminder to self).
-
-
-// 			Ray ray(scene.camera_center, ray_direction);
-
-// 			// TODO (lab 2) : add Monte Carlo / averaging of random ray contributions here
-// 			// TODO (lab 2) : add antialiasing by altering the ray_direction here
-// 			// TODO (lab 2) : add depth of field effect by altering the ray origin (and direction) here
-
-// 			color  = scene.getColor(ray, 0);
-
-// 			image[(i * W + j) * 3 + 0] = std::min(255., std::max(0., 255. * std::pow(color[0] / 255., 1. / scene.gamma)));
-// 			image[(i * W + j) * 3 + 1] = std::min(255., std::max(0., 255. * std::pow(color[1] / 255., 1. / scene.gamma)));
-// 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(color[2] / 255., 1. / scene.gamma)));
-// 		}
-// 	}
-// 	stbi_write_png("image.png", W, H, 3, &image[0], 0);
-
-// 	return 0;
-// }
-
-
-//Notes for self during lecture and for future labs.
+//Notes for self during lecture and for Labs 1-2 implementation.
 //Don't forget the object id and all too.
 //Put white pixel if there is an intersection for example.
 //don't forget to return the object_id.
