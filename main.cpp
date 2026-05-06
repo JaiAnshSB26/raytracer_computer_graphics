@@ -362,7 +362,49 @@ public:
 		build_bvh(root, 0, indices.size());
 	}
 
-	bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id) const {
+	// bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id) const {
+	// 	TriangleIndices t_indices = indices[triangle_id];
+	// 	Vector A = vertices[t_indices.vtx[0]];
+	// 	Vector B = vertices[t_indices.vtx[1]];
+	// 	Vector C = vertices[t_indices.vtx[2]];
+	// 	//take the differences?
+	// 	Vector e1 = B - A;
+	// 	Vector e2 = C - A;
+	// 	Vector N_unormalized = cross(e1, e2);
+	// 	//IMP note to self - double, don't use float by mistake here again, it would blow up the code during compilation again and you won't be able to locate the error!
+	// 	double beta = dot(e2, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
+	// 	double gamma = -dot(e1, cross(A - ray.O, ray.u)) / dot(ray.u, N_unormalized);
+	// 	double alpha = 1 - beta - gamma;
+
+	// 	//if (alpha < 0 || alpha > 1 && beta < 0 || beta > 1 && gamma < 0 || gamma > 1) return false;
+	// 	if (alpha < 0 || alpha > 1 || beta < 0 || beta > 1 || gamma < 0 || gamma > 1) return false;
+
+	// 	double t_cur = dot(A - ray.O, N_unormalized) / dot(ray.u, N_unormalized);
+	// 	if (t_cur < 1e-5) return false;
+		
+	// 	t = t_cur;
+	// 	P = ray.O + t * ray.u;
+		
+	// 	//Interpolate normals if available.
+	// 	if (normals.size() > 0) {
+	// 		Vector normalA = normals[t_indices.n[0]];
+	// 		Vector normalB = normals[t_indices.n[1]];
+	// 		Vector normalC = normals[t_indices.n[2]];
+	// 		N = alpha * normalA + beta * normalB + gamma * normalC;
+	// 		N.normalize(); //Note for self: Don't forget to normalize...
+	// 	} else {
+	// 		N = N_unormalized;
+	// 		N.normalize();
+	// 	}
+
+	// 	//Get the initial rigid look by ignoring interpolated vertex normals (I realised I had generated no pictures with the rigid look before smoothening using interpolation so I added this in later).
+	// 	// N = N_unormalized;
+	// 	// N.normalize();
+		
+	// 	return true;
+	// }
+
+	bool TriangleIntersect(const Ray& ray, Vector& P, double& t, Vector& N, int triangle_id, Vector& hit_albedo) const {
 		TriangleIndices t_indices = indices[triangle_id];
 		Vector A = vertices[t_indices.vtx[0]];
 		Vector B = vertices[t_indices.vtx[1]];
@@ -385,7 +427,6 @@ public:
 		t = t_cur;
 		P = ray.O + t * ray.u;
 		
-		//Interpolate normals if available.
 		if (normals.size() > 0) {
 			Vector normalA = normals[t_indices.n[0]];
 			Vector normalB = normals[t_indices.n[1]];
@@ -396,10 +437,27 @@ public:
 			N = N_unormalized;
 			N.normalize();
 		}
-
-		//Get the initial rigid look by ignoring interpolated vertex normals (I realised I had generated no pictures with the rigid look before smoothening using interpolation so I added this in later).
-		// N = N_unormalized;
-		// N.normalize();
+		
+		if (texture_data && t_indices.uv[0] >= 0) {
+			Vector uvA = uvs[t_indices.uv[0]];
+			Vector uvB = uvs[t_indices.uv[1]];
+			Vector uvC = uvs[t_indices.uv[2]];
+			Vector UV = alpha * uvA + beta * uvB + gamma * uvC;
+			
+			double u = UV[0] - floor(UV[0]);
+			double v = UV[1] - floor(UV[1]);
+			if (u < 0) u += 1.0;
+			if (v < 0) v += 1.0;
+			
+			int tx = std::min(std::max((int)(u * tex_W), 0), tex_W - 1);
+			int ty = std::min(std::max((int)((1.0 - v) * tex_H), 0), tex_H - 1); // Flip Y to match standard OBJ
+			int idx = (ty * tex_W + tx) * 3;
+			hit_albedo = Vector(std::pow(texture_data[idx] / 255.0, 2.2), 
+			                    std::pow(texture_data[idx+1] / 255.0, 2.2), 
+			                    std::pow(texture_data[idx+2] / 255.0, 2.2)); // Gamma correction!
+		} else {
+			hit_albedo = this->albedo;
+		}
 		
 		return true;
 	}
@@ -524,7 +582,7 @@ public:
 	std::vector<Vector> uvs;
 	std::vector<Vector> vertexcolors;
 	BVHNode* root;
-	
+
 	unsigned char* texture_data = nullptr;
 	int tex_W = 0, tex_H = 0, tex_channels = 0;
 
