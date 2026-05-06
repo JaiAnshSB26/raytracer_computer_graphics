@@ -382,16 +382,21 @@ public:
 		t = t_cur;
 		P = ray.O + t * ray.u;
 		
-		if (normals.size() > 0) {
-			Vector normalA = normals[t_indices.n[0]];
-			Vector normalB = normals[t_indices.n[1]];
-			Vector normalC = normals[t_indices.n[2]];
-			N = alpha * normalA + beta * normalB + gamma * normalC;
-			N.normalize(); //Note for self: Don't forget to normalize...
-		} else {
-			N = N_unormalized;
-			N.normalize();
-		}
+		// //Interpolate normals if available.
+		// if (normals.size() > 0) {
+		// 	Vector normalA = normals[t_indices.n[0]];
+		// 	Vector normalB = normals[t_indices.n[1]];
+		// 	Vector normalC = normals[t_indices.n[2]];
+		// 	N = alpha * normalA + beta * normalB + gamma * normalC;
+		// 	N.normalize(); //Note for self: Don't forget to normalize...
+		// } else {
+		// 	N = N_unormalized;
+		// 	N.normalize();
+		// }
+
+		//Trying to get the rigid look by ignoring interpolated vertex normals.
+		N = N_unormalized;
+		N.normalize();
 		
 		return true;
 	}
@@ -789,7 +794,7 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(pixelColor[2] / 255., 1. / scene.gamma)));
 		}
 	}
-	stbi_write_png("image.png", W, H, 3, &image[0], 0);
+	stbi_write_png("image_rigid.png", W, H, 3, &image[0], 0);
 
 	return 0;
 }
