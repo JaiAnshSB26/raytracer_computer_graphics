@@ -170,7 +170,6 @@ public:
 	Vector C;
 };
 
-
 //Implementation of new classes needed for Lab 3 - I begin with this while understanding the Traingles class.
 class BoundingBox {
 public:
@@ -525,6 +524,14 @@ public:
 	std::vector<Vector> uvs;
 	std::vector<Vector> vertexcolors;
 	BVHNode* root;
+	
+	unsigned char* texture_data = nullptr;
+	int tex_W = 0, tex_H = 0, tex_channels = 0;
+
+	void loadTexture(const char* map_file) {
+		texture_data = stbi_load(map_file, &tex_W, &tex_H, &tex_channels, 3);
+		if (!texture_data) printf("Texture failed to load!\n");
+	}
 };
 
 
