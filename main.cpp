@@ -25,6 +25,7 @@
 #define M_PI 3.14159265358979323856
 #endif
 
+// I did want to use using namespace std; but I was afraid it was going to mess me up, so I just used std:: everywhere.
 static std::default_random_engine engine[32];
 static std::uniform_real_distribution<double> uniform(0, 1);
 
@@ -123,7 +124,8 @@ class Object {
 public:
 	Object(const Vector& albedo, bool mirror = false, bool transparent = false) : albedo(albedo), mirror(mirror), transparent(transparent) {};
 
-	virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const = 0;
+	// virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N) const = 0;
+	virtual bool intersect(const Ray& ray, Vector& P, double& t, Vector& N, Vector& hit_albedo) const = 0;
 
 	Vector albedo;
 	bool mirror, transparent;
@@ -137,8 +139,10 @@ public:
 	// if there is an intersection, also computes the point of intersection P, 
 	// t>=0 the distance between the ray origin and P (i.e., the parameter along the ray)
 	// and the unit normal N
-	bool intersect(const Ray& ray, Vector& P, double &t, Vector& N) const {
-		 // TODO (lab 1) : compute the intersection (just true/false at the begining of lab 1, then P, t and N as well)
+	// bool intersect(const Ray& ray, Vector& P, double &t, Vector& N) const {
+	bool intersect(const Ray& ray, Vector& P, double &t, Vector& N, Vector& hit_albedo) const { //trying to implement the texture.
+		hit_albedo = this->albedo; //for the optional texture paert. 
+		// TODO (lab 1) : compute the intersection (just true/false at the begining of lab 1, then P, t and N as well)
 		Vector L = ray.O - C;
 		double b = 2 * dot(ray.u, L);
 		double c = dot(L, L) - R * R;
