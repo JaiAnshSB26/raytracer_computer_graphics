@@ -639,10 +639,10 @@ public:
 		// TODO (lab 1) : if intersect with ray, use the returned information to compute the color ; otherwise black 
 		// in lab 1, the color only includes direct lighting with shadows
 
-		Vector P, N;
+		Vector P, N, hit_albedo;
 		double t;
 		int object_id;
-		if (intersect(ray, P, t, N, object_id)) {
+		if (intersect(ray, P, t, N, object_id, hit_albedo)) {
 
 			if (objects[object_id]->mirror) {
 				Vector R = ray.u - 2.0 * dot(ray.u, N) * N;
@@ -693,24 +693,26 @@ public:
 			int object_id_s;
 
 			// If we hit an object and it's closer than the light (t_s < d), we are in shadow, so we need to implement that check here.
+			Vector dummy_albedo; //for the optional texture part.
 			double visibility = 1.0;
-			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s) && t_s < d) {
+			if (intersect(shadow_ray, P_s, t_s, N_s, object_id_s, dummy_albedo) && t_s < d) {
 				visibility = 0.0; // Pitch black shadow - new addition over the normal return method.
 				//return Vector(0, 0, 0); // Pitch black shadow I assume?
 			}
 			// Compute diffuse shading (Lambertian) - Lab 2 --> include visibility float.
 			double intensity = light_intensity / (4.0 * M_PI * d * d);
 			double diffuse_factor = std::max(0.0, dot(N, L)); // Based on what we were taught in the lecture that we don't consider the negative stuff.
-			Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
-
+			//Vector direct_lighting = objects[object_id]->albedo * (intensity * diffuse_factor * visibility / M_PI);
+			Vector direct_lighting = hit_albedo * (intensity * diffuse_factor * visibility / M_PI);
 			// Lab 2 : Add indirect lighting component with a recursive Monte Carlo call
 			// We need to randomly sample the hemisphere using a cosine-weighted distribution
 			Vector indirect_direction = random_cos(N, thread_id);
 			Ray randomRay(P + 1e-4 * N, indirect_direction);
 			// Ray randomRay(P + 1e-4 * N, indirect_direction);
 			// Only sum the indirect lighting if we haven't hit max recursion
+			//Incorporate the changes for the texture part now.
 			if (recursion_depth + 1 < max_light_bounce) {
-				Vector indirect_lighting = objects[object_id]->albedo * getColor(randomRay, recursion_depth + 1, thread_id);
+				Vector indirect_lighting = hit_albedo * getColor(randomRay, recursion_depth + 1, thread_id);
 				return direct_lighting + indirect_lighting;
 			}
 			return direct_lighting;
@@ -774,9 +776,15 @@ int main() {
 	Sphere floor(Vector(0, -1000, 0), 990, Vector(0.6, 0.5, 0.7));
 
 	//Be careful of the point of intersection and then it should normalize into the right thing when you are happy with it.
+	// TriangleMesh cat(Vector(0.8, 0.8, 0.8));
+	// cat.readOBJ("cat.obj");
+    // cat.scale_translate(0.6, Vector(0, -10, 0)); // as suggested by Prof. Bonneel in class.
+    // cat.init_bvh();
+	//Load for the optional version now.
 	TriangleMesh cat(Vector(0.8, 0.8, 0.8));
-	cat.readOBJ("cat.obj");
-    cat.scale_translate(0.6, Vector(0, -10, 0)); // as suggested by Prof. Bonneel in class.
+    cat.readOBJ("cat.obj");
+    cat.scale_translate(0.6, Vector(0, -10, 0)); 
+    cat.loadTexture("cat_diff.png"); // from the 2D thing we have to laod this for the texture.
     cat.init_bvh();
 
 	Scene scene;
