@@ -794,7 +794,7 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(pixelColor[2] / 255., 1. / scene.gamma)));
 		}
 	}
-	stbi_write_png("image_smoothened_32.png", W, H, 3, &image[0], 0);
+	stbi_write_png("image__restore_smoothened_32.png", W, H, 3, &image[0], 0);
 
 	return 0;
 }
