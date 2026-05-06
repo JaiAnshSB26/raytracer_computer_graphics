@@ -745,7 +745,7 @@ int main() {
 		for (int j = 0; j < W; j++) {
 
 			Vector pixelColor(0., 0., 0.);
-			int NB_PATHS = 1000; //64 // Defined as per the slides, effectively the number of rays we are sending per pixel, test more/less as I experimented later with 32, 64 and 1000 - multi-threaded hence it ran in 43 seconds.
+			int NB_PATHS = 32; //64 // Defined as per the slides, effectively the number of rays we are sending per pixel, test more/less as I experimented later with 32, 64 and 1000 - multi-threaded hence it ran in 43 seconds.
 			
 			for (int k = 0; k < NB_PATHS; k++) {
 				// Box-Muller Gaussian jitter per pixel for anti-aliasing
@@ -794,7 +794,7 @@ int main() {
 			image[(i * W + j) * 3 + 2] = std::min(255., std::max(0., 255. * std::pow(pixelColor[2] / 255., 1. / scene.gamma)));
 		}
 	}
-	stbi_write_png("image_smoothened_1000.png", W, H, 3, &image[0], 0);
+	stbi_write_png("image_smoothened_32.png", W, H, 3, &image[0], 0);
 
 	return 0;
 }
